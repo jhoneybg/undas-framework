@@ -14,57 +14,65 @@ use Symfony\Component\Routing\Matcher\UrlMatcher;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
+use App\Event\FilterRequestEvent;
+use App\Event\FilterResponseEvent;
 
 
 class Kernel implements HttpExceptionInterface
 {
-	private $router;
+    private $router;
 
-	public function __construct()
-	{
-		$this->router = new RouteCollection();
-	}
+    public function __construct()
+    {
+        $this->router = new RouteCollection();
+    }
 
-	public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
-	{
-		$context = new RequestContext();
-		$context->fromRequest($request);
+    public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
+    {
+		$filterRequest = new FilterRequestEvent();
+        $filterRequest->setRequest($request);
+		
+        //Add Filter Query Event
+        $this->eventDispatcher->dispatch(Application::PRE_REQUEST_EVENT, $filterRequest);
 
-		//u		rl matcher
-				$matcher = new UrlMatcher($this->route, $context);
+		if ($response = $filterRequest->getResponse()) {
+            return $response;
+        }
 
-		try {
-			$arttributes = $matcher->match($request->getPathInfo());
+        $context = new RequestContext();
+        $context->fromRequest($request);
 
-			$controller = $attributes['_controller'];
+		//url matcher
+	    $matcher = new UrlMatcher($this->route, $context);
 
-			unset($atributes['_controller']);
+	    try {
+	        $arttributes = $matcher->match($request->getPathInfo());
 
-			$response = call_user_func_array($controller, $atributes);
+	        $controller = $attributes['_controller'];
 
-			$filterResponse = new FilterResponseEvent();
-			$filterResponse->setResponse($response);
+		    unset($atributes['_controller']);
 
-			$this->eventDispatcher->dispatch(Application::PRE_RESPONSE_EVENT, $filterResponse);
+            $response = call_user_func_array($controller, $atributes);
 
-			$response = $filterResponse->getResponse();
-		}
-		catch (ResourceNotFoundException $e) {
-			$response = new Response('Not found!', Response::HTTP_NOT_FOUND);
-		}
+            $filterResponse = new FilterResponseEvent();
+            $filterResponse->setResponse($response);
+            $this->eventDispatcher->dispatch(Application::PRE_RESPONSE_EVENT, $filterResponse);
 
-		return $response;
-	}
+            $response = $filterResponse->getResponse();
+	    } catch (ResourceNotFoundException $e) {
+            $response = new Response('Not found!', Response::HTTP_NOT_FOUND);
+        }
 
-	public function route($path, $controller)
-	{
-		if (!is_callable($controller)) {
+        return $response;
+    }
+    public function route($path, $controller)
+    {
+        if (!is_callable($controller)) {
 			throw new InvalidArgumentException(sprintf('%s is not callable.', $controller));
-		}
-
-		$this->route->add($path, new Route(
+        }
+        $this->route->add($path, new Route(
             $path,
-		    array('_controller' => controller )
+            array('_controller' => controller )
 		));
 	}
 
