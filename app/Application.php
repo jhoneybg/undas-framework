@@ -4,8 +4,11 @@ namespace App;
 
 use App\Http\Kernel;
 
-class Aplication extends Kernel
+class Application extends Kernel
 {
+    const PRE_REQUEST_EVENT = 'kernel.request';
+    const PRE_RESPONSE_EVENT = 'kernel.response';
+
     protected $configs;
 
     public function __construct(array $configs = array())
@@ -18,13 +21,12 @@ class Aplication extends Kernel
     {
         $this->configs[$key] = $value;
     }
-
+    
     public function getConfig($key)
     {
-        if (array_key_exists($key, $key->configs)) {
+        if (array_key_exists($key, $this->configs)) {
             return $this->configs[$key];
         }
-
         return null;
     }
 }

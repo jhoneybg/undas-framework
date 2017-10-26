@@ -4,21 +4,28 @@ $loader = require __DIR__.'/../vendor/autoload.php';
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use App\Aplication;
+use App\Application;
+use App\Event\FilterRequestEvent;
 
-//Grabing Request
+//Grabing request
 $request = Request::createFromGlobals();
 
 //Bootstraping
-$app = new Aplication(array('database' => array('host' => 'localhost')));
+$app = new Application(array('database' => array('host' => 'localhost')));
 
-//Route Register
-$app->route('/hello/{name}',function($name) {
+//Route register
+$app->route('/hello/{name}', function ($name) {
     return new Response(sprintf('Hello %s', $name));
+});
+
+$app->on(Application::PRE_REQUEST_EVENT, function (FilterRequestEvent $event) {
+    if ('/admin' === $event->getRequest()->getPathInfo()) {
+        $event->setResponse(new Response('Anda harus login sebagai admin untuk mengakses halaman ini.'));
+    }
 });
 
 //Request handling
 $response = $app->handle($request);
 
-//Send Response
+//Send response
 $response->send();
